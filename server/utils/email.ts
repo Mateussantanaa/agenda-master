@@ -17,7 +17,7 @@ let transporter: nodemailer.Transporter | null = null;
 
 try {
   if (emailConfig.auth.user && emailConfig.auth.pass) {
-    transporter = nodemailer.createTransporter(emailConfig);
+    transporter = nodemailer.createTransport(emailConfig);
     console.log('Email transporter configured successfully');
   } else {
     console.log('Email credentials not configured - emails will be simulated');
