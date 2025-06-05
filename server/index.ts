@@ -23,6 +23,11 @@ app.post('/api/register', async (req, res) => {
     const { username, name, email, birth_date, password } = req.body;
     console.log('Registering user:', { username, name, email });
     
+    if (!username || !name || !email || !password) {
+      res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
+      return;
+    }
+    
     // Verificar se usuário já existe
     const existingUser = await db
       .selectFrom('users')
@@ -48,7 +53,7 @@ app.post('/api/register', async (req, res) => {
         nome_usuario: username,
         nome: name,
         email,
-        data_nascimento: birth_date,
+        data_nascimento: birth_date || null,
         senha: hashedPassword
       })
       .returning(['id', 'nome_usuario', 'nome', 'email'])
@@ -84,10 +89,19 @@ app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     console.log('Login attempt:', { username });
     
+    if (!username || !password) {
+      res.status(400).json({ error: 'Nome de usuário e senha são obrigatórios' });
+      return;
+    }
+    
+    // Buscar usuário por nome de usuário ou email
     const user = await db
       .selectFrom('users')
       .select(['id', 'nome_usuario', 'nome', 'email', 'senha'])
-      .where('nome_usuario', '=', username)
+      .where((eb) => eb.or([
+        eb('nome_usuario', '=', username),
+        eb('email', '=', username)
+      ]))
       .executeTakeFirst();
     
     if (!user) {
@@ -562,8 +576,36 @@ app.get('/api/achievements', authenticateToken, async (req: AuthRequest, res) =>
   }
 });
 
-// Test email endpoint (development only)
+// Test database connection endpoint (development only)
 if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/test-db', async (req, res) => {
+    try {
+      console.log('Testing database connection...');
+      
+      // Test connection by counting users
+      const result = await db
+        .selectFrom('users')
+        .select(db.fn.count('id').as('count'))
+        .executeTakeFirst();
+      
+      console.log('Database test successful. Users count:', result?.count);
+      res.json({ 
+        success: true, 
+        message: 'Database connection successful',
+        usersCount: Number(result?.count || 0)
+      });
+      return;
+    } catch (error) {
+      console.error('Database test failed:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Database connection failed',
+        details: error.message 
+      });
+      return;
+    }
+  });
+
   app.post('/api/test-email', async (req, res) => {
     try {
       const { email } = req.body;
